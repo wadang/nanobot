@@ -528,6 +528,8 @@ def test_openai_compat_supports_temperature_matches_reasoning_model_rules() -> N
     assert OpenAICompatProvider._supports_temperature("gpt-4o") is True
     assert OpenAICompatProvider._supports_temperature("gpt-5-chat") is False
     assert OpenAICompatProvider._supports_temperature("o3-mini") is False
+    assert OpenAICompatProvider._supports_temperature("claude-4-7-opus") is False
+    assert OpenAICompatProvider._supports_temperature("anthropic/claude-opus-4-7") is False
     assert OpenAICompatProvider._supports_temperature("gpt-4o", reasoning_effort="medium") is False
 
 

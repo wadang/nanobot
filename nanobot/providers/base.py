@@ -13,6 +13,7 @@ from typing import Any
 from loguru import logger
 
 from nanobot.utils.helpers import image_placeholder_text
+from nanobot.utils.llm_io_log import log_llm_exception, log_llm_request, log_llm_response
 
 
 @dataclass
@@ -710,9 +711,57 @@ class LLMProvider(ABC):
         last_response: LLMResponse | None = None
         last_error_key: str | None = None
         identical_error_count = 0
+        stream = "on_content_delta" in kw
+
+        async def _logged_call(
+            call_kw: dict[str, Any],
+            *,
+            attempt: int,
+            note: str | None = None,
+        ) -> LLMResponse:
+            interaction_id = log_llm_request(
+                self,
+                call_kw,
+                attempt=attempt,
+                retry_mode=retry_mode,
+                stream=stream,
+                note=note,
+            )
+            try:
+                result = await call(**call_kw)
+            except asyncio.CancelledError as exc:
+                log_llm_exception(
+                    self,
+                    interaction_id,
+                    exc,
+                    attempt=attempt,
+                    retry_mode=retry_mode,
+                    stream=stream,
+                )
+                raise
+            except Exception as exc:
+                log_llm_exception(
+                    self,
+                    interaction_id,
+                    exc,
+                    attempt=attempt,
+                    retry_mode=retry_mode,
+                    stream=stream,
+                )
+                raise
+            log_llm_response(
+                self,
+                interaction_id,
+                result,
+                attempt=attempt,
+                retry_mode=retry_mode,
+                stream=stream,
+            )
+            return result
+
         while True:
             attempt += 1
-            response = await call(**kw)
+            response = await _logged_call(kw, attempt=attempt)
             if response.finish_reason != "error":
                 return response
             last_response = response
@@ -731,7 +780,11 @@ class LLMProvider(ABC):
                     )
                     retry_kw = dict(kw)
                     retry_kw["messages"] = stripped
-                    result = await call(**retry_kw)
+                    result = await _logged_call(
+                        retry_kw,
+                        attempt=attempt,
+                        note="retry_without_images",
+                    )
                     # Permanently strip images from the original messages so
                     # subsequent iterations do not repeat the error-retry cycle.
                     if result.finish_reason != "error":
@@ -782,7 +835,7 @@ class LLMProvider(ABC):
                 on_retry_wait=on_retry_wait,
             )
 
-        return last_response if last_response is not None else await call(**kw)
+        return last_response if last_response is not None else await _logged_call(kw, attempt=attempt)
 
     @abstractmethod
     def get_default_model(self) -> str:

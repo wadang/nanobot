@@ -436,13 +436,16 @@ class OpenAICompatProvider(LLMProvider):
     ) -> bool:
         """Return True when the model accepts a temperature parameter.
 
-        GPT-5 family and reasoning models (o1/o3/o4) reject temperature
-        when reasoning_effort is set to anything other than ``"none"``.
+        GPT-5 family, reasoning models (o1/o3/o4), and Claude Opus 4.7
+        routed through OpenAI-compatible gateways reject temperature.
         """
         if reasoning_effort and reasoning_effort.lower() != "none":
             return False
         name = model_name.lower()
-        return not any(token in name for token in ("gpt-5", "o1", "o3", "o4"))
+        return not any(
+            token in name
+            for token in ("gpt-5", "o1", "o3", "o4", "claude-4-7-opus", "opus-4-7")
+        )
 
     def _build_kwargs(
         self,

@@ -50,6 +50,7 @@ from nanobot.cli.stream import StreamRenderer, ThinkingSpinner
 from nanobot.config.paths import get_workspace_path, is_default_workspace
 from nanobot.config.schema import Config
 from nanobot.utils.helpers import sync_workspace_templates
+from nanobot.utils.llm_io_log import initialize_llm_io_log
 from nanobot.utils.restart import (
     consume_restart_notice_from_env,
     format_restart_completed_message,
@@ -497,7 +498,6 @@ def serve(
         console.print("[red]aiohttp is required. Install with: pip install 'nanobot-ai[api]'[/red]")
         raise typer.Exit(1)
 
-    from loguru import logger
     from nanobot.agent.loop import AgentLoop
     from nanobot.api.server import create_app
     from nanobot.bus.queue import MessageBus
@@ -509,6 +509,7 @@ def serve(
         logger.disable("nanobot")
 
     runtime_config = _load_runtime_config(config, workspace)
+    initialize_llm_io_log()
     api_cfg = runtime_config.api
     host = host if host is not None else api_cfg.host
     port = port if port is not None else api_cfg.port
@@ -608,6 +609,7 @@ def _run_gateway(
     from nanobot.session.manager import SessionManager
 
     port = port if port is not None else config.gateway.port
+    initialize_llm_io_log()
 
     console.print(f"{__logo__} Starting nanobot gateway version {__version__} on port {port}...")
     sync_workspace_templates(config.workspace_path)
@@ -996,6 +998,7 @@ def agent(
     from nanobot.cron.service import CronService
 
     config = _load_runtime_config(config, workspace)
+    initialize_llm_io_log()
     sync_workspace_templates(config.workspace_path)
 
     bus = MessageBus()
